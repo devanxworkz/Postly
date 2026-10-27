@@ -95,9 +95,70 @@ export async function createConnectLink({ platform, profileId, redirectUrl }) {
   return json;
 }
 
-export async function listAccounts() {
-  const json = await api('/accounts');
+export async function listAccounts(params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const path = qs ? `/accounts?${qs}` : '/accounts';
+  const json = await api(path);
   return json.accounts || json.data || (Array.isArray(json) ? json : []);
+}
+
+export async function getAccount(accountId) {
+  if (!accountId) throw new Error('accountId is required');
+  // Zernio's API requires the health endpoint to retrieve account details.
+  const json = await api(`/accounts/${accountId}/health`);
+  // The response may contain an `account` field or be the account object directly.
+  return json.account || json.data || json;
+}
+
+// Lists Instagram accounts connected to Zernio.
+export async function listInstagramAccounts() {
+  const accounts = await listAccounts({ platform: 'instagram' });
+  return accounts.map((a) => ({
+    id: a._id || a.id,
+    platform: a.platform,
+    username: a.username || a.displayName || a.metadata?.userProfile?.username || null,
+    displayName: a.displayName || a.username || null,
+    profileId: a.profileId?._id || a.profileId || null,
+    status: a.status || (a.connected === false ? 'disconnected' : 'connected'),
+    avatarUrl: a.avatarUrl || a.profilePictureUrl || a.metadata?.userProfile?.profile_picture_url || null,
+    raw: a,
+  }));
+}
+
+// Tests the connection to an Instagram account on Zernio (or validates the API key if no accountId given).
+export async function testInstagramConnection(accountId) {
+  if (!accountId) {
+    const profileId = await ensureProfile();
+    const accounts = await listInstagramAccounts();
+    return {
+      ok: true,
+      profileId,
+      accountsCount: accounts.length,
+      accounts: accounts.map((a) => ({ id: a.id, username: a.username, status: a.status })),
+      message: `Zernio connection verified. Found ${accounts.length} connected Instagram account(s).`,
+    };
+  }
+
+  const account = await getAccount(accountId);
+  const status = account.status || (account.connected === false ? 'disconnected' : 'connected');
+  const username = account.username || account.displayName || account.name || null;
+  const isHealthy = status === 'connected' || account.connected !== false;
+
+  return {
+    ok: isHealthy,
+    accountId: account._id || account.id,
+    username,
+    platform: account.platform,
+    status,
+    message: isHealthy ? `Connection active for @${username || accountId}` : `Account status: ${status}`,
+    account: {
+      id: account._id || account.id,
+      platform: account.platform,
+      username,
+      status,
+      profileId: account.profileId?._id || account.profileId || null,
+    },
+  };
 }
 
 export async function listPinterestBoards(accountId) {
@@ -183,7 +244,7 @@ export async function createZernioPost({
   }
 
   const body = {
-    content: description,
+    content: platform === 'instagram' ? (description || '').slice(0, 2200) : description,
     ...(scheduledFor
       ? { scheduledFor, timezone: 'UTC', publishNow: false }
       : { publishNow: true }),
@@ -237,6 +298,27 @@ export async function createZernioPost({
     post_url: target?.platformPostUrl || null,
     raw: post,
   };
+}
+
+// Publishes an Instagram image-and-caption post (single image or carousel) using the official Zernio API schema.
+export async function publishInstagramPost({
+  accountId,
+  imageUrl,
+  imageUrls = [],
+  caption = '',
+  scheduledFor,
+}) {
+  if (!accountId) throw new Error('accountId is required for Instagram publishing');
+  const images = imageUrls.length ? imageUrls : imageUrl ? [imageUrl] : [];
+  if (images.length === 0) throw new Error('Instagram post requires at least one image URL');
+
+  return createZernioPost({
+    platform: 'instagram',
+    accountId,
+    description: caption,
+    imageUrls: images,
+    scheduledFor,
+  });
 }
 
 // Backwards-compatible Pinterest wrapper.

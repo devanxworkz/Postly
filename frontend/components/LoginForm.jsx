@@ -22,7 +22,10 @@ function LoginFormInner() {
 
   // Where the visitor was heading before the gate stopped them. Sending them
   // on afterwards is the difference between signing in and being interrupted.
-  const next = params.get('next') || '/dashboard';
+  const nextParam = params.get('next');
+  const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') && !nextParam.startsWith('/api/')
+    ? nextParam
+    : '/dashboard';
 
   // The landing page's two buttons differ only in this, so the form opens on
   // the tab the visitor actually asked for.
@@ -38,23 +41,42 @@ function LoginFormInner() {
     setBusy(true);
     setError(null);
 
-    if (isSignup) {
-      const res = await fetch('/api/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+    const email = form.email.trim();
+    const password = form.password;
+    const name = form.name.trim();
+
+    try {
+      if (isSignup) {
+        const res = await fetch('/api/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(json.error || 'Sign up failed.');
+          setBusy(false);
+          return;
+        }
+      }
+
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
       });
-      const json = await res.json();
-      if (!res.ok) { setError(json.error || 'Sign up failed.'); setBusy(false); return; }
+      if (result?.error) {
+        setError(isSignup ? 'Account created, but sign in failed. Please sign in.' : 'Incorrect email or password.');
+        setBusy(false);
+        return;
+      }
+
+      router.push(next);
+      router.refresh();
+    } catch (err) {
+      setError(err?.message || 'Something went wrong. Please try again.');
+      setBusy(false);
     }
-
-    const result = await signIn('credentials', {
-      email: form.email, password: form.password, redirect: false,
-    });
-    if (result?.error) { setError('Incorrect email or password.'); setBusy(false); return; }
-
-    router.push(next);
-    router.refresh();
   }
 
   return (

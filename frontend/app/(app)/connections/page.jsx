@@ -36,6 +36,28 @@ function Dashboard() {
     load();
   }
 
+  const [testNotice, setTestNotice] = useState(null);
+  const [testingId, setTestingId] = useState(null);
+
+  async function testConnection(id) {
+    setTestingId(id);
+    setTestNotice(null);
+    try {
+      const res = await fetch(`/api/connections/${id}/test`, { method: 'POST' });
+      const json = await res.json();
+      if (res.ok && json.ok) {
+        setTestNotice({ ok: true, message: json.message || 'Connection verified successfully.' });
+      } else {
+        setTestNotice({ ok: false, message: json.error || json.message || 'Connection test failed.' });
+      }
+      load();
+    } catch (e) {
+      setTestNotice({ ok: false, message: e.message });
+    } finally {
+      setTestingId(null);
+    }
+  }
+
   const byPlatform = {};
   for (const c of data.connections) (byPlatform[c.platform] ||= []).push(c);
   const isLive = (c) => c.status === 'connected';
@@ -55,6 +77,12 @@ function Dashboard() {
 
       {connected && <div className="notice ok"><strong>✓</strong><span>{connected} connected successfully.</span></div>}
       {error && <div className="notice err"><strong>!</strong><span>{error}</span></div>}
+      {testNotice && (
+        <div className={`notice ${testNotice.ok ? 'ok' : 'err'}`}>
+          <strong>{testNotice.ok ? '✓' : '!'}</strong>
+          <span>{testNotice.message}</span>
+        </div>
+      )}
 
       {loading ? (
         <div className="grid">
@@ -134,6 +162,14 @@ function Dashboard() {
                     </div>
                   ) : isConnected ? (
                     <>
+                      <button
+                        className="btn btn-outline"
+                        type="button"
+                        disabled={testingId === conns[0].id}
+                        onClick={() => testConnection(conns[0].id)}
+                      >
+                        {testingId === conns[0].id ? 'Testing...' : 'Test'}
+                      </button>
                       <a className="btn btn-outline" href={p.connectPath}>Reconnect</a>
                       <button className="btn btn-ghost" onClick={() => disconnect(conns[0].id)}>Disconnect</button>
                     </>

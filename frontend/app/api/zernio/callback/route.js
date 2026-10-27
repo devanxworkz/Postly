@@ -15,7 +15,7 @@ export const runtime = 'nodejs';
 export async function GET(request) {
   const base = appBaseUrl();
   const url = new URL(request.url);
-  const fail = (msg) => NextResponse.redirect(`${base}/?error=${encodeURIComponent(msg.slice(0, 300))}`);
+  const fail = (msg) => NextResponse.redirect(`${base}/connections?error=${encodeURIComponent(msg.slice(0, 300))}`);
 
   const userId = await currentUserId();
   if (!userId) return NextResponse.redirect(`${base}/login`);
@@ -91,7 +91,7 @@ export async function GET(request) {
     [userId, platformKey, username, accountId, JSON.stringify(extra), credentialId]
   );
 
-  const res = NextResponse.redirect(`${base}/?connected=${encodeURIComponent(platformKey)}`);
+  const res = NextResponse.redirect(`${base}/connections?connected=${encodeURIComponent(platformKey)}`);
   res.cookies.set('postly_zernio_state', '', { maxAge: 0, path: '/' });
   res.cookies.set('postly_zernio_cred', '', { maxAge: 0, path: '/' });
   return res;

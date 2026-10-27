@@ -13,7 +13,7 @@ import { NextResponse } from 'next/server';
 // cookie gains nothing — `auth()` runs again in the page and in every API
 // route, where the signature is actually verified.
 
-const PUBLIC_PATHS = new Set(['/', '/login', '/privacy', '/terms']);
+const PUBLIC_PATHS = new Set(['/', '/login', '/privacy', '/terms', '/api/signup']);
 
 // Marketing and auth pages a signed-in user should not linger on.
 const REDIRECT_WHEN_SIGNED_IN = new Set(['/', '/login']);
@@ -38,7 +38,21 @@ export function middleware(request) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  if (PUBLIC_PATHS.has(pathname) || signedIn) return NextResponse.next();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-pathname', pathname);
+
+  if (PUBLIC_PATHS.has(pathname) || signedIn) {
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
+  }
+
+  // API endpoints should return a 401 JSON error rather than redirecting to an HTML page.
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
 
   // Remember where they were headed, so signing in finishes the journey rather
   // than dumping everyone on the dashboard.
@@ -52,6 +66,6 @@ export const config = {
     // Everything except Next's own assets, the auth endpoints, the render and
     // cron endpoints (which authenticate with their own tokens, not a session),
     // and the click tracker (which must work for people who are not users).
-    '/((?!api/auth|api/cron|api/render|api/scheduler|r/|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|ico|webp|mp4|woff2?)$).*)',
+    '/((?!api/auth|api/signup|api/cron|api/render|api/scheduler|r/|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|ico|webp|mp4|woff2?)$).*)',
   ],
 };

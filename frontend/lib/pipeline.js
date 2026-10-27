@@ -1175,10 +1175,12 @@ async function publishViaZernio(conn, content, platform, scheduledAt) {
   const accountId = conn.extra?.zernio_account_id || conn.account_id;
   if (!accountId) throw new Error('Zernio connection is missing its account id');
 
-  // TikTok takes video or photos, but never a text-only post, and it has no
-  // link field — the destination lives in the caption/bio instead.
+  // TikTok and Instagram take video or photos, but never a text-only post.
   if (platform === 'tiktok' && !content.videoUrl && slideUrls(content).length === 0) {
     throw new Error('TikTok posts need a video or at least one image');
+  }
+  if (platform === 'instagram' && !content.videoUrl && slideUrls(content).length === 0) {
+    throw new Error('Instagram posts need at least one image or video');
   }
 
   // Pinterest is the only platform that carries a per-pin title and outbound

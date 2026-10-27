@@ -18,6 +18,7 @@ const GROUPS = [
       { href: '/create', label: 'Create', icon: 'create' },
       { href: '/automations', label: 'Automations', icon: 'automation' },
       { href: '/products', label: 'Products', icon: 'tag' },
+      { href: '/creator', label: 'Creator Page', icon: 'link' },
     ],
   },
   {
