@@ -18,6 +18,10 @@ export const runtime = 'nodejs';
 export async function GET(request, { params }) {
   const key = params.platform;
   const base = appBaseUrl();
+  // Ensure the redirect base is HTTPS (except for localhost dev)
+  if (base !== 'http://localhost:3000' && !base.startsWith('https://')) {
+    return NextResponse.redirect(`${base}/?error=${encodeURIComponent('APP_BASE_URL must be HTTPS for Instagram OAuth')}`);
+  }
 
   const userId = await currentUserId();
   if (!userId) return NextResponse.redirect(`${base}/login`);
